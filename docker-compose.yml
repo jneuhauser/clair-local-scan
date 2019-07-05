@@ -1,0 +1,31 @@
+version: '3.7'
+
+services:
+  postgres:
+    image: postgres:9.6
+    restart: unless-stopped
+    volumes:
+      - ./docker-compose-data/postgres-data/:/var/lib/postgresql/data:rw
+    environment:
+      - POSTGRES_PASSWORD=ChangeMe0815
+      - POSTGRES_USER=clair
+      - POSTGRES_DB=clair
+    networks:
+      - clair_backend
+
+  clair:
+    image: quay.io/coreos/clair:v2.0.8
+    restart: unless-stopped
+    volumes:
+      - ./docker-compose-data/clair-config/:/config/:ro
+      - ./docker-compose-data/clair-tmp/:/tmp/:rw
+    networks:
+      - clair_backend
+    ports:
+      - "127.0.0.1:6060:6060"
+      - "127.0.0.1:6061:6061"
+    command: [--log-level=debug, --config, /config/config.yml]
+    user: root
+
+networks:
+  clair_backend:
