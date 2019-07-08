@@ -1,0 +1,51 @@
+# This file is a template, and might need editing before it works on your project.
+# Use it directly and adopt to your needs.
+
+stages:
+  - build
+  - scan
+  - push
+
+build_container:
+  stage: build
+  tags:
+    - shell
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA .
+
+container_scanning:
+  stage: scan
+  tags:
+    - shell
+  variables:
+    # Container Scanning deals with Docker images only so no need to import the project's Git repository:
+    GIT_STRATEGY: none
+  allow_failure: false
+  script:
+    - clair-scanner -h >/dev/null || exit 0
+    - if [ -z "$CLAIR_THRESHOLD" ]; then CLAIR_THRESHOLD="Negligible"; fi
+    - touch clair-whitelist.yml
+    - clair-scanner
+      -t $CLAIR_THRESHOLD
+      -w clair-whitelist.yml
+      -r gl-container-scanning-report.json
+      -l clair.log
+      --all
+      $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+  only:
+    refs:
+      - branches
+  except:
+    variables:
+      - $CONTAINER_SCANNING_DISABLED
+
+push_container:
+  stage: push
+  tags:
+    - shell
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker push $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG:$CI_COMMIT_SHA
